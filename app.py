@@ -17,10 +17,20 @@ from dotenv import load_dotenv
 
 # Right after imports and before anything else
 print(f"Current working directory: {os.getcwd()}")
-print(f".env file exists: {os.path.exists('.env')}")
-with open('.env', 'r') as f:
-    print("Contents of .env file:")
-    print(f.read())
+
+# Try to load .env file, but don't fail if it doesn't exist
+try:
+    print(f".env file exists: {os.path.exists('.env')}")
+    load_dotenv(verbose=True)  # This will silently continue if .env doesn't exist
+except Exception as e:
+    print(f"Error loading .env: {str(e)}")
+
+# Set default values to environment variables if not already set
+if not os.environ.get("SUPABASE_URL"):
+    os.environ["SUPABASE_URL"] = "https://krjeghqfszngpoogvnrd.supabase.co"
+if not os.environ.get("SUPABASE_KEY"):
+    os.environ["SUPABASE_KEY"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtyamVnaHFmc3puZ3Bvb2d2bnJkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDcwMDY0MSwiZXhwIjoyMDU2Mjc2NjQxfQ.II-HxLnt0Mm_Ql3xkn5EZ0NY-kYlODQ-cS7pSsL6iZg"
+
 print("Now loading environment variables...")
 
 # Determine environment
