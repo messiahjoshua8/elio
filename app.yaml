@@ -1,0 +1,5 @@
+runtime: python39
+entrypoint: gunicorn -b :$PORT app:app
+
+env_variables:
+  GOOGLE_APPLICATION_CREDENTIALS: "astute-setting-453616-i4-1b42112072cf.json" 
