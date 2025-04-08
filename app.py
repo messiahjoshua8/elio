@@ -392,6 +392,12 @@ def analyze_and_save():
         if 'image' not in request.files:
             return jsonify({'error': 'No image provided'}), 400
             
+        # Get user and organization info from request
+        user_id = request.form.get('user_id', '29545123-118e-4c95-8cea-59ee52411732')  # Default if not provided
+        organization_id = request.form.get('organization_id', '117d5be5-c6d2-47e4-bfcf-49caaa6cad15')  # Default if not provided
+        print(f"User ID: {user_id}")
+        print(f"Organization ID: {organization_id}")
+        
         image = request.files['image']
         content = image.read()
         image = vision.Image(content=content)
@@ -429,8 +435,8 @@ def analyze_and_save():
             'created_at': datetime.now().isoformat(),
             'full_text': texts[0].description if texts else "",
             'product_name': product_info['product_name'],
-            'organization_id': '117d5be5-c6d2-47e4-bfcf-49caaa6cad15',  # Add org ID
-            'scanned_by': '29545123-118e-4c95-8cea-59ee52411732',  # Add user ID
+            'organization_id': organization_id,
+            'scanned_by': user_id,
             'analysis_data': json.dumps({
                 'product_info': product_info,
                 'objects': [{
@@ -943,12 +949,59 @@ def ping():
         'timestamp': datetime.now().isoformat()
     })
 
+@app.route('/api-docs', methods=['GET'])
+def api_docs():
+    """Documentation on how to use the API"""
+    return jsonify({
+        'api_name': 'Elio Vision API',
+        'base_url': 'https://elio-vision-api-production.up.railway.app',
+        'description': 'API for analyzing medical supplies using Google Vision',
+        'endpoints': [
+            {
+                'path': '/analyze',
+                'method': 'POST',
+                'description': 'Analyze an image without saving to database',
+                'parameters': [
+                    {'name': 'image', 'type': 'file', 'required': True, 'description': 'Image file to analyze'}
+                ]
+            },
+            {
+                'path': '/analyze-and-save',
+                'method': 'POST',
+                'description': 'Analyze an image and save results to Supabase',
+                'parameters': [
+                    {'name': 'image', 'type': 'file', 'required': True, 'description': 'Image file to analyze'},
+                    {'name': 'user_id', 'type': 'string', 'required': False, 'description': 'ID of the user performing the scan'},
+                    {'name': 'organization_id', 'type': 'string', 'required': False, 'description': 'ID of the organization'}
+                ]
+            },
+            {
+                'path': '/analyze-and-save-basic',
+                'method': 'POST',
+                'description': 'Simplified version of analyze-and-save with minimal database schema',
+                'parameters': [
+                    {'name': 'image', 'type': 'file', 'required': True, 'description': 'Image file to analyze'},
+                    {'name': 'user_id', 'type': 'string', 'required': False, 'description': 'ID of the user performing the scan'},
+                    {'name': 'organization_id', 'type': 'string', 'required': False, 'description': 'ID of the organization'}
+                ]
+            }
+        ],
+        'usage_example': {
+            'curl': 'curl -X POST -F "image=@image.jpg" -F "user_id=USER_ID" -F "organization_id=ORG_ID" https://elio-vision-api-production.up.railway.app/analyze-and-save',
+            'javascript': 'const formData = new FormData(); formData.append("image", imageFile); formData.append("user_id", "USER_ID"); formData.append("organization_id", "ORG_ID"); fetch("https://elio-vision-api-production.up.railway.app/analyze-and-save", { method: "POST", body: formData }).then(res => res.json()).then(data => console.log(data));'
+        }
+    })
+
 @app.route('/analyze-and-save-basic', methods=['POST'])
 def analyze_and_save_basic():
     try:
         if 'image' not in request.files:
             return jsonify({'error': 'No image provided'}), 400
             
+        # Get user and organization info from request
+        user_id = request.form.get('user_id', '29545123-118e-4c95-8cea-59ee52411732')  # Default if not provided
+        organization_id = request.form.get('organization_id', '117d5be5-c6d2-47e4-bfcf-49caaa6cad15')  # Default if not provided
+        
         image = request.files['image']
         content = image.read()
         image = vision.Image(content=content)
@@ -977,8 +1030,8 @@ def analyze_and_save_basic():
         scan_id = str(uuid.uuid4())
         scan_record = {
             'id': scan_id,
-            'organization_id': '117d5be5-c6d2-47e4-bfcf-49caaa6cad15',
-            'scanned_by': '29545123-118e-4c95-8cea-59ee52411732',
+            'organization_id': organization_id,
+            'scanned_by': user_id,
             'scan_type': 'label_scan',
             'full_text': texts[0].description if texts else "",
             'product_name': product_info['product_name'] or "Unknown Product",
