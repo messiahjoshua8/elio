@@ -18,6 +18,18 @@ from dotenv import load_dotenv
 # Right after imports and before anything else
 print(f"Current working directory: {os.getcwd()}")
 
+# Debug print all environment variables
+print("=== DEBUG: Environment Variables ===")
+print(f"ENVIRONMENT: {os.environ.get('ENVIRONMENT')}")
+print(f"SUPABASE_URL exists: {os.environ.get('SUPABASE_URL') is not None}")
+print(f"SUPABASE_KEY exists: {os.environ.get('SUPABASE_KEY') is not None}")
+print(f"ENCRYPTED_GOOGLE_CREDENTIALS exists: {os.environ.get('ENCRYPTED_GOOGLE_CREDENTIALS') is not None}")
+print(f"CREDENTIALS_ENCRYPTION_SALT exists: {os.environ.get('CREDENTIALS_ENCRYPTION_SALT') is not None}")
+print(f"CREDENTIALS_ENCRYPTION_KEY exists: {os.environ.get('CREDENTIALS_ENCRYPTION_KEY') is not None}")
+if os.environ.get('ENCRYPTED_GOOGLE_CREDENTIALS'):
+    print(f"ENCRYPTED_GOOGLE_CREDENTIALS starts with: {os.environ.get('ENCRYPTED_GOOGLE_CREDENTIALS')[:20]}...")
+print("=== END DEBUG ===")
+
 # Try to load .env file, but don't fail if it doesn't exist
 try:
     print(f".env file exists: {os.path.exists('.env')}")
@@ -124,7 +136,13 @@ def get_vision_client():
     encryption_key = os.environ.get('CREDENTIALS_ENCRYPTION_KEY')
     encryption_salt = os.environ.get('CREDENTIALS_ENCRYPTION_SALT')
     
-    if is_production and encrypted_creds and encryption_key and encryption_salt:
+    # Print debug information about environment variables
+    print(f"Environment is production: {is_production}")
+    print(f"ENCRYPTED_GOOGLE_CREDENTIALS: {'Found' if encrypted_creds else 'Not found'}")
+    print(f"CREDENTIALS_ENCRYPTION_KEY: {'Found' if encryption_key else 'Not found'}")
+    print(f"CREDENTIALS_ENCRYPTION_SALT: {'Found' if encryption_salt else 'Not found'}")
+    
+    if encrypted_creds and encryption_key and encryption_salt:
         try:
             # Decode the salt and encrypted data
             salt = base64.b64decode(encryption_salt)
@@ -141,22 +159,29 @@ def get_vision_client():
             info = json.loads(decrypted_data)
             credentials = service_account.Credentials.from_service_account_info(info)
             print("Using encrypted credentials from environment variables")
+            return vision.ImageAnnotatorClient(credentials=credentials)
             
         except Exception as e:
             print(f"Error decrypting credentials: {str(e)}")
-            # Fall back to file-based credentials
+            # Only fall back to file if it exists
             credentials_path = os.path.join(os.path.dirname(__file__), 
                                          "astute-setting-453616-i4-1b42112072cf.json")
-            credentials = service_account.Credentials.from_service_account_file(credentials_path)
-            print(f"Using credentials file: {credentials_path}")
+            if os.path.exists(credentials_path):
+                print(f"Falling back to credentials file: {credentials_path}")
+                credentials = service_account.Credentials.from_service_account_file(credentials_path)
+                return vision.ImageAnnotatorClient(credentials=credentials)
+            else:
+                raise Exception("No valid credentials found. Please set up environment variables or provide a credentials file.")
     else:
-        # Use direct file for development
+        # Only try the file-based approach if not in production or if the file exists
         credentials_path = os.path.join(os.path.dirname(__file__), 
                                      "astute-setting-453616-i4-1b42112072cf.json")
-        credentials = service_account.Credentials.from_service_account_file(credentials_path)
-        print(f"Using credentials file: {credentials_path}")
-    
-    return vision.ImageAnnotatorClient(credentials=credentials)
+        if os.path.exists(credentials_path):
+            print(f"Using credentials file: {credentials_path}")
+            credentials = service_account.Credentials.from_service_account_file(credentials_path)
+            return vision.ImageAnnotatorClient(credentials=credentials)
+        else:
+            raise Exception("No valid credentials found. Please set up environment variables or provide a credentials file.")
 
 # Initialize the client
 client = get_vision_client()
@@ -834,6 +859,28 @@ def complete_db_test():
             'error_type': type(e).__name__,
             'attempted_record': complete_record
         }), 500
+
+@app.route('/debug-environment', methods=['GET'])
+def debug_environment():
+    """Endpoint to check environment variable status"""
+    env_vars = {
+        'ENVIRONMENT': os.environ.get('ENVIRONMENT'),
+        'SUPABASE_URL_EXISTS': os.environ.get('SUPABASE_URL') is not None,
+        'SUPABASE_KEY_EXISTS': os.environ.get('SUPABASE_KEY') is not None,
+        'ENCRYPTED_GOOGLE_CREDENTIALS_EXISTS': os.environ.get('ENCRYPTED_GOOGLE_CREDENTIALS') is not None,
+        'CREDENTIALS_ENCRYPTION_SALT_EXISTS': os.environ.get('CREDENTIALS_ENCRYPTION_SALT') is not None,
+        'CREDENTIALS_ENCRYPTION_KEY_EXISTS': os.environ.get('CREDENTIALS_ENCRYPTION_KEY') is not None,
+        'ENV_FILE_EXISTS': os.path.exists('.env'),
+        'CREDENTIALS_FILE_EXISTS': os.path.exists(os.path.join(os.path.dirname(__file__), 
+                                                            "astute-setting-453616-i4-1b42112072cf.json")),
+        'CURRENT_DIRECTORY': os.getcwd(),
+        'DIRECTORY_CONTENTS': os.listdir(os.getcwd()),
+    }
+    
+    return jsonify({
+        'success': True,
+        'environment_debug': env_vars
+    })
 
 @app.route('/analyze-and-save-basic', methods=['POST'])
 def analyze_and_save_basic():
