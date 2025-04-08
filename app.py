@@ -26,8 +26,26 @@ print(f"SUPABASE_KEY exists: {os.environ.get('SUPABASE_KEY') is not None}")
 print(f"ENCRYPTED_GOOGLE_CREDENTIALS exists: {os.environ.get('ENCRYPTED_GOOGLE_CREDENTIALS') is not None}")
 print(f"CREDENTIALS_ENCRYPTION_SALT exists: {os.environ.get('CREDENTIALS_ENCRYPTION_SALT') is not None}")
 print(f"CREDENTIALS_ENCRYPTION_KEY exists: {os.environ.get('CREDENTIALS_ENCRYPTION_KEY') is not None}")
-if os.environ.get('ENCRYPTED_GOOGLE_CREDENTIALS'):
-    print(f"ENCRYPTED_GOOGLE_CREDENTIALS starts with: {os.environ.get('ENCRYPTED_GOOGLE_CREDENTIALS')[:20]}...")
+
+# Show actual keys with some masking
+print("=== SENSITIVE DATA DEBUGGING ===")
+for env_var in ['SUPABASE_KEY', 'ENCRYPTED_GOOGLE_CREDENTIALS', 'CREDENTIALS_ENCRYPTION_KEY', 'CREDENTIALS_ENCRYPTION_SALT']:
+    value = os.environ.get(env_var)
+    if value:
+        if len(value) > 30:
+            # Show first 10 and last 5 chars
+            masked_value = f"{value[:10]}...{value[-5:]}"
+        else:
+            # Show first 3 and last 3 chars
+            masked_value = f"{value[:3]}...{value[-3:]}"
+        print(f"{env_var}: {masked_value}")
+    else:
+        print(f"{env_var}: NOT SET")
+
+# Show all environment variables (without values)
+print("=== ALL ENVIRONMENT VARIABLES (NAMES ONLY) ===")
+for key in sorted(os.environ.keys()):
+    print(f"- {key}")
 print("=== END DEBUG ===")
 
 # Try to load .env file, but don't fail if it doesn't exist
@@ -131,12 +149,18 @@ def get_vision_client():
     # Get the environment
     is_production = os.environ.get('ENVIRONMENT') == 'production'
     
-    # Try to get encrypted credentials
+    # Try to get encrypted credentials - check exact case-sensitive variable names
+    print("=== CASE SENSITIVITY DEBUG ===")
+    for key in sorted(os.environ.keys()):
+        if "CREDENTIAL" in key.upper() or "ENCRYPT" in key.upper():
+            print(f"Found environment variable: {key}")
+    print("=== END CASE DEBUG ===")
+    
     encrypted_creds = os.environ.get('ENCRYPTED_GOOGLE_CREDENTIALS')
     encryption_key = os.environ.get('CREDENTIALS_ENCRYPTION_KEY')
     encryption_salt = os.environ.get('CREDENTIALS_ENCRYPTION_SALT')
     
-    # Print debug information about environment variables
+    # Print debug information about environment variables 
     print(f"Environment is production: {is_production}")
     print(f"ENCRYPTED_GOOGLE_CREDENTIALS: {'Found' if encrypted_creds else 'Not found'}")
     print(f"CREDENTIALS_ENCRYPTION_KEY: {'Found' if encryption_key else 'Not found'}")
@@ -169,6 +193,10 @@ def get_vision_client():
         if encrypted_creds and encryption_key and encryption_salt:
             try:
                 # Decode the salt and encrypted data
+                print(f"Attempting to decrypt with key starting with {encryption_key[:3]}")
+                print(f"Salt value starts with {encryption_salt[:10]}")
+                print(f"Encrypted credentials starts with {encrypted_creds[:10]}")
+                
                 salt = base64.b64decode(encryption_salt)
                 encrypted_data = base64.b64decode(encrypted_creds)
                 
@@ -191,6 +219,7 @@ def get_vision_client():
         # Try file-based credentials if available
         credentials_path = os.path.join(os.path.dirname(__file__), 
                                      "astute-setting-453616-i4-1b42112072cf.json")
+        print(f"Checking for file existence: {credentials_path}, exists: {os.path.exists(credentials_path)}")
         if os.path.exists(credentials_path):
             print(f"Using credentials file: {credentials_path}")
             credentials = service_account.Credentials.from_service_account_file(credentials_path)
@@ -903,6 +932,15 @@ def debug_environment():
     return jsonify({
         'success': True,
         'environment_debug': env_vars
+    })
+
+@app.route('/ping', methods=['GET'])
+def ping():
+    """Simple endpoint to check if the app is running"""
+    return jsonify({
+        'success': True,
+        'message': 'App is running successfully!',
+        'timestamp': datetime.now().isoformat()
     })
 
 @app.route('/analyze-and-save-basic', methods=['POST'])
